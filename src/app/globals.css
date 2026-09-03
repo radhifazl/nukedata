@@ -1,26 +1,139 @@
 @import "tailwindcss";
-
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fcfcfb;
+  --foreground: #18212f;
+  --surface: #fff;
+  --surface-elevated: #f6f7f8;
+  --border: #e5e7eb;
+  --muted: #f3f4f6;
+  --muted-foreground: #667085;
+  --primary: #3447a6;
+  --primary-foreground: #fff;
+  --success: #17805c;
+  --warning: #a86210;
+  --danger: #bf4342;
 }
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
-
+html {
+  scroll-behavior: smooth;
+}
 body {
+  min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+button,
+input {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.button-primary,
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.button-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 10%);
+}
+.button-primary:hover {
+  background: #2b3b8c;
+  transform: translateY(-1px);
+}
+.button-secondary {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+.button-secondary:hover {
+  background: var(--surface-elevated);
+}
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.issue-badge {
+  display: inline-flex;
+  border: 1px solid currentColor;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.issue-danger {
+  color: var(--danger);
+  background: #fff7f7;
+}
+.issue-warning {
+  color: var(--warning);
+  background: #fffbf3;
+}
+html.dark {
+  --background: #10131a;
+  --foreground: #f5f7fb;
+  --surface: #171b24;
+  --surface-elevated: #1c212c;
+  --border: #2b313d;
+  --muted: #202632;
+  --muted-foreground: #a3adbd;
+  --primary: #8797fa;
+  --primary-foreground: #10131a;
+  --success: #5ad5a6;
+  --warning: #f0ad55;
+  --danger: #f48d8d;
+}
+html.dark .issue-danger {
+  background: #2e1d23;
+}
+html.dark .issue-warning {
+  background: #312817;
 }

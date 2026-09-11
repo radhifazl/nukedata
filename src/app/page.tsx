@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { CsvUpload, type UploadHandle } from "@/components/csv-upload";
+import { useDataset } from "@/context/DatasetContext";
 
 const rows = [
   ["John Doe", "john@email.com", "Indonesia", ""],
@@ -10,6 +12,82 @@ const rows = [
   ["John Doe", "john@email.com", "Indonesia", "duplicate"],
   ["Alex", "—", "INDONESIA", "missing"],
 ];
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function fileExt(name: string): string {
+  return (name.split(".").pop() ?? "file").toUpperCase();
+}
+
+function RecentDatasetsList() {
+  const { recentDatasets, dataset } = useDataset();
+
+  if (recentDatasets.length === 0) return null;
+
+  const shown = recentDatasets.slice(0, 5);
+
+  return (
+    <section className="mt-10">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        Recent datasets
+      </p>
+      <div className="space-y-1">
+        {shown.map((entry) => {
+          const isCurrent = dataset?.name === entry.name;
+          const href = isCurrent ? "/datasets/preview?tab=overview" : null;
+
+          const inner = (
+            <div className="flex items-center gap-3 rounded-sm border border-border bg-surface px-3 py-2.5 transition-colors hover:bg-surface-elevated">
+              <span className="shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 font-mono text-[0.6rem] font-medium text-primary">
+                {fileExt(entry.name)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground" title={entry.name}>
+                  {entry.name}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {entry.rowCount.toLocaleString()} rows · {entry.columnCount} columns · {formatSize(entry.fileSize)}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-muted-foreground">{relativeTime(entry.loadedAt)}</p>
+                {!isCurrent && (
+                  <p className="mt-0.5 text-[0.65rem] text-muted-foreground/60">Re-upload to restore</p>
+                )}
+              </div>
+            </div>
+          );
+
+          return href ? (
+            <Link key={`${entry.name}-${entry.loadedAt}`} href={href} className="block">
+              {inner}
+            </Link>
+          ) : (
+            <div key={`${entry.name}-${entry.loadedAt}`} className="cursor-default opacity-70">
+              {inner}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 export default function Home() {
   const uploadRef = useRef<UploadHandle>(null);
@@ -43,6 +121,7 @@ export default function Home() {
           </div>
           <div id="upload" className="scroll-mt-8">
             <CsvUpload ref={uploadRef} />
+            <RecentDatasetsList />
           </div>
         </section>
         <section

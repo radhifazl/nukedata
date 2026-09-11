@@ -3,21 +3,24 @@ import Link from "next/link";
 import { useDataset } from "@/context/DatasetContext";
 import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
 import { AppShell } from "@/components/app-shell";
+import { cleanedXlsxFilename } from "@/utils/export/exportCsv";
+import { exportDatasetAsXlsx } from "@/utils/export/exportXlsx";
 
 function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024)
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function scoreStatus(score: number): { text: string; colour: string } {
   if (score >= 90) return { text: "Good quality", colour: "text-success" };
-  if (score >= 70) return { text: "Acceptable quality", colour: "text-warning" };
+  if (score >= 70)
+    return { text: "Acceptable quality", colour: "text-warning" };
   return { text: "Needs attention", colour: "text-danger" };
 }
 
 export default function DatasetPreviewPage() {
-  const { dataset, profile, operations, cleanedProfile } = useDataset();
+  const { dataset, profile, operations, cleanedProfile, cleanedDataset } =
+    useDataset();
 
   if (!dataset || !profile) {
     return (
@@ -28,7 +31,7 @@ export default function DatasetPreviewPage() {
               No dataset loaded
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Upload a CSV file to get started.
+              Upload a CSV or Excel dataset file to get started.
             </p>
             <Link href="/" className="button-primary mt-6 inline-flex">
               ← Upload a file
@@ -40,11 +43,25 @@ export default function DatasetPreviewPage() {
   }
 
   const colCount = dataset.columns.length;
+  // Effective row count: show cleaned count when operations exist
+  const effectiveRowCount = (cleanedDataset ?? dataset).rowCount;
   const { text: statusText, colour: statusColour } = scoreStatus(
-    profile.qualityScore
+    profile.qualityScore,
   );
 
   const hasCleanedScore = operations.length > 0 && cleanedProfile !== null;
+  const hasOperations = operations.length > 0;
+
+  function handleQuickExport() {
+    if (!dataset) return;
+    const effective = cleanedDataset ?? dataset;
+    // Default to XLSX for the quick-export button — opens correctly in Excel
+    // on all locales without needing to configure list separators.
+    const filename = hasOperations
+      ? cleanedXlsxFilename(dataset.name)
+      : cleanedXlsxFilename(dataset.name).replace("_cleaned", "");
+    exportDatasetAsXlsx(effective, filename);
+  }
 
   return (
     <AppShell>
@@ -62,41 +79,71 @@ export default function DatasetPreviewPage() {
               {dataset.name}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {dataset.rowCount.toLocaleString()} row
-              {dataset.rowCount !== 1 ? "s" : ""}{" "}
-              <span aria-hidden>·</span>{" "}
+              {effectiveRowCount.toLocaleString()} row
+              {effectiveRowCount !== 1 ? "s" : ""} <span aria-hidden>·</span>{" "}
               {colCount} column{colCount !== 1 ? "s" : ""}{" "}
               <span aria-hidden>·</span> {formatSize(dataset.fileSize)}
             </p>
           </div>
 
-          <div className="text-right">
-            {hasCleanedScore ? (
-              <div className="flex items-center gap-3">
-                <div>
-                  <p className={`font-mono text-base tabular-nums text-muted-foreground line-through`}>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleQuickExport}
+              className="button-secondary text-xs min-h-0 px-3 py-2 hidden sm:inline-flex"
+              title={
+                hasOperations
+                  ? "Export cleaned dataset as XLSX"
+                  : "Export dataset as XLSX"
+              }
+            >
+              ↓ {hasOperations ? "Export Cleaned" : "Export XLSX"}
+            </button>
+            <div className="text-right">
+              {hasCleanedScore ? (
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p
+                      className={`font-mono text-base tabular-nums text-muted-foreground line-through`}
+                    >
+                      {profile.qualityScore}
+                    </p>
+                    <p className="text-[0.65rem] text-muted-foreground">
+                      Original
+                    </p>
+                  </div>
+                  <span className="text-muted-foreground" aria-hidden>
+                    →
+                  </span>
+                  <div>
+                    <p
+                      className={`font-mono text-xl font-semibold tabular-nums text-success`}
+                    >
+                      {cleanedProfile!.qualityScore}
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {" "}
+                        / 100
+                      </span>
+                    </p>
+                    <p className="text-xs font-medium text-success">Cleaned</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p
+                    className={`font-mono text-xl font-semibold tabular-nums ${statusColour}`}
+                  >
                     {profile.qualityScore}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {" "}
+                      / 100
+                    </span>
                   </p>
-                  <p className="text-[0.65rem] text-muted-foreground">Original</p>
-                </div>
-                <span className="text-muted-foreground" aria-hidden>→</span>
-                <div>
-                  <p className={`font-mono text-xl font-semibold tabular-nums text-success`}>
-                    {cleanedProfile!.qualityScore}
-                    <span className="text-sm font-normal text-muted-foreground"> / 100</span>
+                  <p className={`text-xs font-medium ${statusColour}`}>
+                    {statusText}
                   </p>
-                  <p className="text-xs font-medium text-success">Cleaned</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className={`font-mono text-xl font-semibold tabular-nums ${statusColour}`}>
-                  {profile.qualityScore}
-                  <span className="text-sm font-normal text-muted-foreground"> / 100</span>
-                </p>
-                <p className={`text-xs font-medium ${statusColour}`}>{statusText}</p>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 

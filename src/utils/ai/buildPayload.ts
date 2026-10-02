@@ -24,16 +24,31 @@ export function buildAiPayload(profile: DatasetProfile): AiAnalysisPayload {
       uniqueRatio: Math.round(col.uniqueRatio * 1000) / 1000,
     };
 
+    if (col.isEmpty) {
+      base.isEmpty = true;
+    }
+
     if (col.numericStats) {
-      base.min = col.numericStats.min;
-      base.max = col.numericStats.max;
-      base.mean = Math.round(col.numericStats.mean * 100) / 100;
-      base.median = col.numericStats.median;
+      const s = col.numericStats;
+      base.min = s.min;
+      base.max = s.max;
+      base.mean = Math.round(s.mean * 100) / 100;
+      base.median = s.median;
+      base.stdDev = Math.round(s.stdDev * 100) / 100;
+      base.q1 = s.q1;
+      base.q3 = s.q3;
+      base.iqr = Math.round(s.iqr * 100) / 100;
+      base.sum = Math.round(s.sum * 100) / 100;
     }
 
     if (col.dateStats) {
       base.earliest = col.dateStats.earliest;
       base.latest = col.dateStats.latest;
+    }
+
+    if (col.categoricalStats?.modes.length) {
+      base.mode = col.categoricalStats.modes[0].value;
+      base.modeCount = col.categoricalStats.modes[0].count;
     }
 
     if (col.inconsistentGroups.length > 0) {
@@ -58,6 +73,7 @@ export function buildAiPayload(profile: DatasetProfile): AiAnalysisPayload {
     qualityScore: profile.qualityScore,
     duplicateRowCount: profile.duplicateRowCount,
     incompleteRowCount: profile.incompleteRowCount,
+    emptyColumnCount: profile.emptyColumnCount,
     columns,
     issues,
   };

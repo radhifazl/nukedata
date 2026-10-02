@@ -4,6 +4,7 @@ import type { DataIssue } from "@/types/profile";
 import type { CleaningOperation } from "@/types/cleaning";
 import { useDataset } from "@/context/DatasetContext";
 import { isMissing } from "@/utils/csv/profileDataset";
+import { calcMean, calcMedian, parseNumericValue } from "@/utils/stats";
 
 interface CleaningPanelProps {
   issue: DataIssue | null;
@@ -75,6 +76,14 @@ function ActiveCleaningPanel({
           onClose={onClose}
         />
       );
+    case "empty_column":
+      return (
+        <EmptyColumnPanel
+          issue={issue}
+          addOperation={addOperation}
+          onClose={onClose}
+        />
+      );
     default:
       return (
         <div className="border border-border bg-surface p-6 text-sm text-muted-foreground">
@@ -110,18 +119,6 @@ function getColType(
   if (numericCount >= threshold && threshold > 0) return "number";
   if (dateCount >= threshold && threshold > 0) return "date";
   return "text";
-}
-
-function calcMean(nums: number[]): number {
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
-}
-
-function calcMedian(nums: number[]): number {
-  const sorted = [...nums].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
 }
 
 function uniqueId(): string {
@@ -328,12 +325,13 @@ function MissingValuesPanel({
     return dataset.rows
       .map((r) => r[column])
       .filter((v) => !isMissing(v))
-      .map((v) => parseFloat(String(v).replace(/,/g, "")))
-      .filter((n) => !isNaN(n));
+      .map((v) => parseNumericValue(String(v)))
+      .filter((n): n is number => n !== null);
   }, [dataset.rows, column, colType]);
 
+  const sortedNums = useMemo(() => [...numericValues].sort((a, b) => a - b), [numericValues]);
   const mean = numericValues.length > 0 ? Math.round(calcMean(numericValues) * 100) / 100 : 0;
-  const median = numericValues.length > 0 ? calcMedian(numericValues) : 0;
+  const median = sortedNums.length > 0 ? calcMedian(sortedNums) : 0;
 
   function fillValue(): string | null {
     if (fillOption === "leave") return null;
@@ -656,6 +654,57 @@ function OutliersPanel({
           </div>
         </div>
       )}
+    </PanelWrapper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty Column Panel
+// ---------------------------------------------------------------------------
+
+function EmptyColumnPanel({
+  issue,
+  addOperation,
+  onClose,
+}: {
+  issue: DataIssue;
+  addOperation: (op: CleaningOperation) => void;
+  onClose: () => void;
+}) {
+  const column = issue.column!;
+
+  function handleApply() {
+    addOperation({
+      id: uniqueId(),
+      type: "remove_column",
+      column,
+      config: { column },
+      description: `Remove empty column \`${column}\``,
+      affectedCount: 0,
+    });
+    onClose();
+  }
+
+  return (
+    <PanelWrapper
+      title={`Remove empty column \`${column}\``}
+      description={issue.description}
+      onApply={handleApply}
+      onClose={onClose}
+      applyLabel="Remove column"
+    >
+      <div className="space-y-3">
+        <div className="rounded-sm border border-warning/30 bg-warning/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            <code className="font-mono font-medium">{column}</code> contains{" "}
+            <strong>no values</strong> across all {issue.count.toLocaleString()} rows.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Removing it will delete the column from the dataset entirely.
+            This action can be undone.
+          </p>
+        </div>
+      </div>
     </PanelWrapper>
   );
 }

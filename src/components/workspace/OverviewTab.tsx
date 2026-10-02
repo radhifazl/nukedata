@@ -5,6 +5,7 @@ const ISSUE_ICONS: Record<DataIssueType, string> = {
   duplicate_rows: "⊡",
   inconsistent_values: "≈",
   potential_outliers: "◇",
+  empty_column: "∅",
 };
 
 const ISSUE_TYPE_LABELS: Record<DataIssueType, string> = {
@@ -12,6 +13,7 @@ const ISSUE_TYPE_LABELS: Record<DataIssueType, string> = {
   duplicate_rows: "Duplicate rows",
   inconsistent_values: "Inconsistent values",
   potential_outliers: "Potential outliers",
+  empty_column: "Empty columns",
 };
 
 interface OverviewTabProps {
@@ -98,7 +100,7 @@ export function OverviewTab({
         <MetricCell
           label="Missing values"
           value={totalMissing.toLocaleString()}
-          sub={totalMissing === 0 ? "none" : `across ${profile.columns.filter(c => c.missingCount > 0).length} column${profile.columns.filter(c => c.missingCount > 0).length !== 1 ? "s" : ""}`}
+          sub={totalMissing === 0 ? "none" : `across ${profile.columns.filter(c => c.missingCount > 0 && !c.isEmpty).length} column${profile.columns.filter(c => c.missingCount > 0 && !c.isEmpty).length !== 1 ? "s" : ""}`}
           variant={totalMissing === 0 ? "good" : "warn"}
         />
         <MetricCell
@@ -129,6 +131,7 @@ export function OverviewTab({
                 "duplicate_rows",
                 "inconsistent_values",
                 "potential_outliers",
+                "empty_column",
               ] as DataIssueType[]
             )
               .filter((type) => grouped.has(type))

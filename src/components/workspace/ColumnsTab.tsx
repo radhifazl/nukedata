@@ -1,6 +1,10 @@
 "use client";
 import { useState, useMemo } from "react";
-import type { ColumnProfile, ColumnType, DatasetProfile } from "@/types/profile";
+import type {
+  ColumnProfile,
+  ColumnType,
+  DatasetProfile,
+} from "@/types/profile";
 
 const TYPE_LABEL: Record<ColumnType, string> = {
   text: "Text",
@@ -19,7 +23,11 @@ interface ColumnsTabProps {
   onFocusColumn: (name: string | null) => void;
 }
 
-export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTabProps) {
+export function ColumnsTab({
+  profile,
+  focusedColumn,
+  onFocusColumn,
+}: ColumnsTabProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [issueFilter, setIssueFilter] = useState<IssueFilter>("all");
@@ -34,28 +42,33 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
 
   const filtered = useMemo(() => {
     return profile.columns.filter((col) => {
-      if (search && !col.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !col.name.toLowerCase().includes(search.toLowerCase()))
+        return false;
       if (typeFilter !== "all" && col.inferredType !== typeFilter) return false;
-      if (issueFilter === "has_issues" && !columnHasIssue.has(col.name)) return false;
-      if (issueFilter === "no_issues" && columnHasIssue.has(col.name)) return false;
+      if (issueFilter === "has_issues" && !columnHasIssue.has(col.name))
+        return false;
+      if (issueFilter === "no_issues" && columnHasIssue.has(col.name))
+        return false;
       return true;
     });
   }, [profile.columns, search, typeFilter, issueFilter, columnHasIssue]);
 
   const activeColumn = focusedColumn
-    ? profile.columns.find((c) => c.name === focusedColumn) ?? null
+    ? (profile.columns.find((c) => c.name === focusedColumn) ?? null)
     : null;
 
   // Available type values in this dataset
   const availableTypes = useMemo(
     () => Array.from(new Set(profile.columns.map((c) => c.inferredType))),
-    [profile.columns]
+    [profile.columns],
   );
 
   return (
     <div className="flex gap-0">
       {/* ── Column list ─────────────────────────────────────────── */}
-      <div className={`min-w-0 flex-1 ${activeColumn ? "hidden sm:block" : ""}`}>
+      <div
+        className={`min-w-0 flex-1 ${activeColumn ? "hidden sm:block" : ""}`}
+      >
         {/* Controls */}
         <div className="mb-3 flex flex-wrap gap-2">
           <input
@@ -66,7 +79,7 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
             className="h-8 min-w-[10rem] flex-1 border border-border bg-surface px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <div className="flex flex-wrap gap-1">
-            {(["all", ...availableTypes] as (TypeFilter)[]).map((t) => (
+            {(["all", ...availableTypes] as TypeFilter[]).map((t) => (
               <FilterChip
                 key={t}
                 active={typeFilter === t}
@@ -83,7 +96,11 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
                 active={issueFilter === f}
                 onClick={() => setIssueFilter(f)}
               >
-                {f === "all" ? "All" : f === "has_issues" ? "Has issues" : "Clean"}
+                {f === "all"
+                  ? "All"
+                  : f === "has_issues"
+                    ? "Has issues"
+                    : "Clean"}
               </FilterChip>
             ))}
           </div>
@@ -91,7 +108,8 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
 
         {/* Count */}
         <p className="mb-2 text-xs text-muted-foreground">
-          {filtered.length} of {profile.columns.length} column{profile.columns.length !== 1 ? "s" : ""}
+          {filtered.length} of {profile.columns.length} column
+          {profile.columns.length !== 1 ? "s" : ""}
         </p>
 
         {/* Table */}
@@ -100,17 +118,30 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface-elevated">
-                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">Column</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">Type</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Missing</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Unique</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Column
+                  </th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Type
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                    Missing
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                    Unique
+                  </th>
+                  <th className="px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={5}
+                      className="px-4 py-8 text-center text-sm text-muted-foreground"
+                    >
                       No columns match the current filters.
                     </td>
                   </tr>
@@ -121,7 +152,9 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
                     return (
                       <tr
                         key={col.name}
-                        onClick={() => onFocusColumn(isSelected ? null : col.name)}
+                        onClick={() =>
+                          onFocusColumn(isSelected ? null : col.name)
+                        }
                         className={`cursor-pointer border-t border-border transition-colors ${
                           isSelected
                             ? "bg-primary/5"
@@ -138,17 +171,25 @@ export function ColumnsTab({ profile, focusedColumn, onFocusColumn }: ColumnsTab
                             {TYPE_LABEL[col.inferredType]}
                           </span>
                         </td>
-                        <td className={`px-4 py-2.5 text-right font-mono text-xs tabular-nums ${col.missingCount > 0 ? "text-warning" : "text-muted-foreground"}`}>
-                          {col.missingCount > 0 ? col.missingCount.toLocaleString() : "—"}
+                        <td
+                          className={`px-4 py-2.5 text-right font-mono text-xs tabular-nums ${col.missingCount > 0 ? "text-warning" : "text-muted-foreground"}`}
+                        >
+                          {col.missingCount > 0
+                            ? col.missingCount.toLocaleString()
+                            : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {col.uniqueCount.toLocaleString()}
                         </td>
                         <td className="px-4 py-2.5">
                           {hasIssue ? (
-                            <span className="issue-badge issue-warning">Issues</span>
+                            <span className="issue-badge issue-warning">
+                              Issues
+                            </span>
                           ) : (
-                            <span className="text-xs text-success">✓ Clean</span>
+                            <span className="text-xs text-success">
+                              ✓ Clean
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -185,9 +226,7 @@ function ColumnDetailPanel({
   onClose: () => void;
 }) {
   const completeness =
-    rowCount > 0
-      ? ((col.totalValues / rowCount) * 100).toFixed(1)
-      : "100.0";
+    rowCount > 0 ? ((col.totalValues / rowCount) * 100).toFixed(1) : "100.0";
   const completenessNum = parseFloat(completeness);
   const barWidth = Math.max(0, Math.min(100, completenessNum));
 
@@ -219,8 +258,12 @@ function ColumnDetailPanel({
           <DetailRow label="Values" value={col.totalValues.toLocaleString()} />
           <DetailRow
             label="Missing"
-            value={col.missingCount > 0 ? col.missingCount.toLocaleString() : "0"}
-            valueClass={col.missingCount > 0 ? "text-warning" : "text-muted-foreground"}
+            value={
+              col.missingCount > 0 ? col.missingCount.toLocaleString() : "0"
+            }
+            valueClass={
+              col.missingCount > 0 ? "text-warning" : "text-muted-foreground"
+            }
           />
           <DetailRow label="Unique" value={col.uniqueCount.toLocaleString()} />
           <DetailRow
@@ -233,7 +276,9 @@ function ColumnDetailPanel({
         <div>
           <div className="mb-1.5 flex justify-between text-xs">
             <span className="text-muted-foreground">Completeness</span>
-            <span className={`font-medium ${completenessNum < 95 ? "text-warning" : "text-success"}`}>
+            <span
+              className={`font-medium ${completenessNum < 95 ? "text-warning" : "text-success"}`}
+            >
               {completeness}%
             </span>
           </div>
@@ -245,6 +290,13 @@ function ColumnDetailPanel({
           </div>
         </div>
 
+        {/* Empty column badge */}
+        {col.isEmpty && (
+          <div className="rounded-sm border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-warning">
+            This column is entirely empty.
+          </div>
+        )}
+
         {/* Numeric stats */}
         {col.numericStats && (
           <div>
@@ -254,11 +306,20 @@ function ColumnDetailPanel({
             <div className="space-y-1.5">
               {(
                 [
-                  ["Min", col.numericStats.min],
-                  ["Max", col.numericStats.max],
+                  ["Count", col.numericStats.count],
+                  ["Sum", col.numericStats.sum],
                   ["Mean", col.numericStats.mean],
                   ["Median", col.numericStats.median],
                   ["Std Dev", col.numericStats.stdDev],
+                  ["Variance", col.numericStats.variance],
+                  ["Min", col.numericStats.min],
+                  ["Max", col.numericStats.max],
+                  ["Range", col.numericStats.range],
+                  ["Q1", col.numericStats.q1],
+                  ["Q3", col.numericStats.q3],
+                  ["IQR", col.numericStats.iqr],
+                  ["P10", col.numericStats.p10],
+                  ["P90", col.numericStats.p90],
                 ] as [string, number][]
               ).map(([label, val]) => (
                 <DetailRow
@@ -268,11 +329,88 @@ function ColumnDetailPanel({
                     Number.isFinite(val)
                       ? val % 1 === 0
                         ? val.toLocaleString()
-                        : val.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                        : val.toLocaleString(undefined, {
+                            maximumFractionDigits: 4,
+                          })
                       : "—"
                   }
                 />
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Categorical stats (mode + top values) */}
+        {col.categoricalStats && (
+          <div>
+            <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-widest text-muted-foreground">
+              Top Values
+            </p>
+            <div className="space-y-1">
+              {col.categoricalStats.modes.length === 1 && (
+                <DetailRow
+                  label="Mode"
+                  value={`"${col.categoricalStats.modes[0].value}" (${col.categoricalStats.modes[0].count.toLocaleString()})`}
+                />
+              )}
+              {col.categoricalStats.modes.length > 1 && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    Mode (tied)
+                  </span>
+                  <span className="font-mono text-xs text-foreground text-right">
+                    {col.categoricalStats.modes
+                      .slice(0, 3)
+                      .map((m) => `"${m.value}"`)
+                      .join(", ")}
+                  </span>
+                </div>
+              )}
+              <div className="mt-2 space-y-1">
+                {col.categoricalStats.topValues.slice(0, 5).map((tv) => (
+                  <div
+                    key={tv.value}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span
+                      className="min-w-0 truncate font-mono text-xs text-foreground"
+                      title={tv.value}
+                    >
+                      {tv.value}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="w-16 bg-border h-1">
+                        <div
+                          className="h-full bg-primary/50"
+                          style={{ width: `${Math.min(100, tv.percentage)}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right font-mono text-[0.65rem] text-muted-foreground">
+                        {tv.count.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Boolean stats */}
+        {col.booleanStats && (
+          <div>
+            <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-widest text-muted-foreground">
+              Distribution
+            </p>
+            <div className="space-y-1.5">
+              <DetailRow
+                label="True"
+                value={`${col.booleanStats.trueCount.toLocaleString()} (${col.booleanStats.truePercentage.toFixed(1)}%)`}
+              />
+              <DetailRow
+                label="False"
+                value={`${col.booleanStats.falseCount.toLocaleString()} (${col.booleanStats.falsePercentage.toFixed(1)}%)`}
+              />
             </div>
           </div>
         )}
@@ -284,8 +422,17 @@ function ColumnDetailPanel({
               Date Range
             </p>
             <div className="space-y-1.5">
-              <DetailRow label="Earliest" value={col.dateStats.earliest || "—"} />
+              <DetailRow
+                label="Earliest"
+                value={col.dateStats.earliest || "—"}
+              />
               <DetailRow label="Latest" value={col.dateStats.latest || "—"} />
+              {col.dateStats.rangeDays !== null && (
+                <DetailRow
+                  label="Span"
+                  value={`${col.dateStats.rangeDays.toLocaleString()} days`}
+                />
+              )}
             </div>
           </div>
         )}
@@ -298,7 +445,10 @@ function ColumnDetailPanel({
             </p>
             <div className="space-y-2">
               {col.inconsistentGroups.slice(0, 6).map((group) => (
-                <div key={group.normalizedForm} className="flex flex-wrap gap-1">
+                <div
+                  key={group.normalizedForm}
+                  className="flex flex-wrap gap-1"
+                >
                   {group.rawValues.map((v) => (
                     <code
                       key={v}
@@ -311,7 +461,8 @@ function ColumnDetailPanel({
               ))}
               {col.inconsistentGroups.length > 6 && (
                 <p className="text-xs text-muted-foreground">
-                  + {col.inconsistentGroups.length - 6} more group{col.inconsistentGroups.length - 6 !== 1 ? "s" : ""}
+                  + {col.inconsistentGroups.length - 6} more group
+                  {col.inconsistentGroups.length - 6 !== 1 ? "s" : ""}
                 </p>
               )}
             </div>
@@ -334,7 +485,9 @@ function DetailRow({
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className={`font-mono text-xs font-medium tabular-nums ${valueClass}`}>
+      <span
+        className={`font-mono text-xs font-medium tabular-nums ${valueClass}`}
+      >
         {value}
       </span>
     </div>

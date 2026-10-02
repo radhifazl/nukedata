@@ -1,3 +1,10 @@
+import type {
+  NumericColumnStats,
+  CategoricalColumnStats,
+  DateColumnStats,
+  BooleanColumnStats,
+} from "@/utils/stats";
+
 /** Basic column data types inferred from cell values. */
 export type ColumnType = "text" | "number" | "boolean" | "date" | "unknown";
 
@@ -12,22 +19,17 @@ export type DataIssueType =
   | "missing_values"
   | "duplicate_rows"
   | "inconsistent_values"
-  | "potential_outliers";
+  | "potential_outliers"
+  | "empty_column";
 
-/** Statistics calculated only for numeric columns. */
-export interface NumericStats {
-  min: number;
-  max: number;
-  mean: number;
-  median: number;
-  stdDev: number;
-}
+/**
+ * @deprecated Use NumericColumnStats from utils/stats instead.
+ * Kept for backward compat with anything that imports NumericStats from here.
+ */
+export type NumericStats = NumericColumnStats;
 
 /** Statistics calculated only for date columns. */
-export interface DateStats {
-  earliest: string;
-  latest: string;
-}
+export type DateStats = DateColumnStats;
 
 /** Full profile of a single column. */
 export interface ColumnProfile {
@@ -39,8 +41,12 @@ export interface ColumnProfile {
   uniqueCount: number;
   /** Ratio of unique non-missing values to total non-missing values (0–1). */
   uniqueRatio: number;
-  numericStats: NumericStats | null;
-  dateStats: DateStats | null;
+  /** True when this column has zero non-missing values (entirely empty). */
+  isEmpty: boolean;
+  numericStats: NumericColumnStats | null;
+  dateStats: DateColumnStats | null;
+  categoricalStats: CategoricalColumnStats | null;
+  booleanStats: BooleanColumnStats | null;
   /** Distinct normalised values that share a normalised form (inconsistency candidates). */
   inconsistentGroups: InconsistentGroup[];
 }
@@ -78,6 +84,8 @@ export interface DatasetProfile {
   /** Number of rows that contain at least one missing value. */
   incompleteRowCount: number;
   duplicateRowCount: number;
+  /** Number of columns with zero non-missing values. */
+  emptyColumnCount: number;
   columns: ColumnProfile[];
   issues: DataIssue[];
   /**
@@ -85,10 +93,11 @@ export interface DatasetProfile {
    *
    * Scoring logic (documented in profileDataset.ts):
    *   starts at 100
-   *   − missingValuePenalty  (up to 30 pts based on missing-value ratio)
+   *   − missingValuePenalty  (up to 30 pts — only non-empty columns)
    *   − duplicatePenalty     (up to 20 pts based on duplicate ratio)
    *   − inconsistencyPenalty (up to 20 pts, 5 pts per affected column, max 4)
    *   − outlierPenalty       (up to 10 pts based on outlier ratio)
+   *   − emptyColumnPenalty   (up to 10 pts, 2.5 pts per empty column, max 4)
    *   clamped to [0, 100]
    */
   qualityScore: number;

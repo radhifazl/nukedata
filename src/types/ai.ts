@@ -10,12 +10,23 @@ export interface AiColumnPayload {
   missing: number;
   unique: number;
   uniqueRatio: number;
+  isEmpty?: boolean;
+  // Numeric
   min?: number;
   max?: number;
   mean?: number;
   median?: number;
+  stdDev?: number;
+  q1?: number;
+  q3?: number;
+  iqr?: number;
+  sum?: number;
+  // Date
   earliest?: string;
   latest?: string;
+  // Categorical
+  mode?: string;
+  modeCount?: number;
   inconsistentGroupCount?: number;
 }
 
@@ -35,6 +46,7 @@ export interface AiAnalysisPayload {
   qualityScore: number;
   duplicateRowCount: number;
   incompleteRowCount: number;
+  emptyColumnCount: number;
   columns: AiColumnPayload[];
   issues: AiIssuePayload[];
 }

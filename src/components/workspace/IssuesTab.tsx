@@ -6,6 +6,7 @@ const ALL_TYPES: DataIssueType[] = [
   "duplicate_rows",
   "inconsistent_values",
   "potential_outliers",
+  "empty_column",
 ];
 
 const TYPE_LABEL: Record<DataIssueType, string> = {
@@ -13,6 +14,7 @@ const TYPE_LABEL: Record<DataIssueType, string> = {
   duplicate_rows: "Duplicate rows",
   inconsistent_values: "Inconsistent values",
   potential_outliers: "Potential outliers",
+  empty_column: "Empty columns",
 };
 
 const TYPE_ICON: Record<DataIssueType, string> = {
@@ -20,6 +22,7 @@ const TYPE_ICON: Record<DataIssueType, string> = {
   duplicate_rows: "⊡",
   inconsistent_values: "≈",
   potential_outliers: "◇",
+  empty_column: "∅",
 };
 
 const SEVERITY_BADGE: Record<string, string> = {

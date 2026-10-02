@@ -5,8 +5,14 @@ import type {
   DataIssue,
   DatasetProfile,
   InconsistentGroup,
-  NumericStats,
 } from "@/types/profile";
+import {
+  calcNumericStats,
+  calcCategoricalStats,
+  calcDateStats,
+  calcBooleanStats,
+  countOutliers,
+} from "@/utils/stats";
 
 /** Extended column profile used only during profiling; not exposed outside this module. */
 type ColumnProfileInternal = ColumnProfile & { outlierCount: number };
@@ -105,83 +111,6 @@ function inferType(nonMissingValues: string[]): ColumnType {
 }
 
 // ---------------------------------------------------------------------------
-// Numeric statistics
-// ---------------------------------------------------------------------------
-
-function parseNumeric(str: string): number {
-  // Strip thousands-separator commas before parsing.
-  return parseFloat(str.replace(/,/g, ""));
-}
-
-function calcMean(nums: number[]): number {
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
-}
-
-function calcMedian(sorted: number[]): number {
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-function calcStdDev(nums: number[], mean: number): number {
-  const variance =
-    nums.reduce((sum, n) => sum + (n - mean) ** 2, 0) / nums.length;
-  return Math.sqrt(variance);
-}
-
-function calcNumericStats(nonMissingValues: string[]): NumericStats {
-  const nums = nonMissingValues.map(parseNumeric);
-  const sorted = [...nums].sort((a, b) => a - b);
-  const mean = calcMean(nums);
-  return {
-    min: sorted[0],
-    max: sorted[sorted.length - 1],
-    mean,
-    median: calcMedian(sorted),
-    stdDev: calcStdDev(nums, mean),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Outlier detection (IQR method)
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the number of values outside [Q1 − 1.5×IQR, Q3 + 1.5×IQR].
- * Only meaningful for numeric columns with > 3 non-missing values.
- */
-function countOutliers(nonMissingValues: string[]): number {
-  if (nonMissingValues.length < 4) return 0;
-  const sorted = nonMissingValues.map(parseNumeric).sort((a, b) => a - b);
-  const q1 = sorted[Math.floor(sorted.length * 0.25)];
-  const q3 = sorted[Math.floor(sorted.length * 0.75)];
-  const iqr = q3 - q1;
-  if (iqr === 0) return 0; // All values equal — no outliers possible.
-  const lower = q1 - 1.5 * iqr;
-  const upper = q3 + 1.5 * iqr;
-  return sorted.filter((v) => v < lower || v > upper).length;
-}
-
-// ---------------------------------------------------------------------------
-// Date statistics
-// ---------------------------------------------------------------------------
-
-function calcDateStats(
-  nonMissingValues: string[]
-): { earliest: string; latest: string } {
-  const times = nonMissingValues
-    .map((v) => new Date(v.trim()).getTime())
-    .filter((t) => !isNaN(t))
-    .sort((a, b) => a - b);
-  if (times.length === 0) return { earliest: "", latest: "" };
-  return {
-    earliest: new Date(times[0]).toISOString().slice(0, 10),
-    latest: new Date(times[times.length - 1]).toISOString().slice(0, 10),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Inconsistency detection
 // ---------------------------------------------------------------------------
 
@@ -248,39 +177,44 @@ function countDuplicateRows(
  * Calculates a data-quality score from 0–100 based on detected issues.
  *
  * Penalty schedule (all clamped to their maximum before summing):
- *   Missing values  : up to 30 pts  (missRatio × 30, where missRatio = missingCells / totalCells)
+ *   Missing values  : up to 30 pts  (missRatio × 30 — only cells in non-empty columns)
  *   Duplicate rows  : up to 20 pts  (dupRatio  × 20, where dupRatio  = duplicates  / rowCount)
  *   Inconsistencies : up to 20 pts  (5 pts per column with any inconsistent group, max 4 columns)
  *   Outliers        : up to 10 pts  (outlierRatio × 10, where outlierRatio = outlierCells / totalNumericCells)
+ *   Empty columns   : up to 10 pts  (2.5 pts per empty column, max 4 columns)
  *
  * Final score = 100 − totalPenalty, clamped to [0, 100].
  */
 function calcQualityScore({
-  totalCells,
-  totalMissing,
+  totalCellsNonEmpty,
+  totalMissingNonEmpty,
   rowCount,
   duplicateRowCount,
   columnsWithInconsistencies,
   totalNumericCells,
   totalOutliers,
+  emptyColumnCount,
 }: {
-  totalCells: number;
-  totalMissing: number;
+  totalCellsNonEmpty: number;
+  totalMissingNonEmpty: number;
   rowCount: number;
   duplicateRowCount: number;
   columnsWithInconsistencies: number;
   totalNumericCells: number;
   totalOutliers: number;
+  emptyColumnCount: number;
 }): number {
   const missPenalty =
-    totalCells > 0 ? (totalMissing / totalCells) * 30 : 0;
+    totalCellsNonEmpty > 0 ? (totalMissingNonEmpty / totalCellsNonEmpty) * 30 : 0;
   const dupPenalty =
     rowCount > 0 ? (duplicateRowCount / rowCount) * 20 : 0;
   const inconsistencyPenalty = Math.min(columnsWithInconsistencies, 4) * 5;
   const outlierPenalty =
     totalNumericCells > 0 ? (totalOutliers / totalNumericCells) * 10 : 0;
+  const emptyColPenalty = Math.min(emptyColumnCount, 4) * 2.5;
 
-  const total = missPenalty + dupPenalty + inconsistencyPenalty + outlierPenalty;
+  const total =
+    missPenalty + dupPenalty + inconsistencyPenalty + outlierPenalty + emptyColPenalty;
   return Math.round(Math.max(0, Math.min(100, 100 - total)));
 }
 
@@ -325,14 +259,25 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
   }
 
   // Track totals needed for scoring
-  let totalMissing = 0;
+  let totalMissingNonEmpty = 0; // only counts missing from non-empty columns
+  let totalCellsNonEmpty = 0;   // only cells in non-empty columns
   let totalNumericCells = 0;
   let totalOutliers = 0;
   let columnsWithInconsistencies = 0;
+  let emptyColumnCount = 0;
 
   const columnProfiles: ColumnProfile[] = columnNames.map((name, ci) => {
     const { nonMissing, missingCount } = accumulators[ci];
-    totalMissing += missingCount;
+    const isEmpty = nonMissing.length === 0;
+
+    if (isEmpty) {
+      emptyColumnCount++;
+      // Do NOT add this column's missing count to the quality-score penalty;
+      // an empty column is tracked separately.
+    } else {
+      totalMissingNonEmpty += missingCount;
+      totalCellsNonEmpty += rowCount; // all rows contribute to a non-empty column
+    }
 
     const inferredType = inferType(nonMissing);
 
@@ -358,6 +303,21 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
       dateStats = calcDateStats(nonMissing);
     }
 
+    // Categorical stats (text, boolean, unknown, and non-numeric number-like)
+    let categoricalStats = null;
+    if (
+      (inferredType === "text" || inferredType === "unknown") &&
+      nonMissing.length > 0
+    ) {
+      categoricalStats = calcCategoricalStats(nonMissing, rowCount);
+    }
+
+    // Boolean stats
+    let booleanStats = null;
+    if (inferredType === "boolean" && nonMissing.length > 0) {
+      booleanStats = calcBooleanStats(nonMissing, rowCount);
+    }
+
     // Inconsistency detection (text/unknown columns only)
     let inconsistentGroups: InconsistentGroup[] = [];
     if (inferredType === "text" || inferredType === "unknown") {
@@ -372,8 +332,11 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
       missingCount,
       uniqueCount,
       uniqueRatio,
+      isEmpty,
       numericStats,
       dateStats,
+      categoricalStats,
+      booleanStats,
       inconsistentGroups,
       outlierCount,
     } satisfies ColumnProfileInternal;
@@ -391,9 +354,9 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
   // --- Issues ---
   const issues: DataIssue[] = [];
 
-  // Missing values — one issue per column that has any
+  // Missing values — one issue per non-empty column that has any missing
   for (const col of columnProfiles) {
-    if (col.missingCount > 0) {
+    if (col.missingCount > 0 && !col.isEmpty) {
       const ratio = col.missingCount / rowCount;
       const severity =
         ratio >= 0.2 ? "high" : ratio >= 0.05 ? "medium" : "low";
@@ -453,15 +416,30 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
     }
   }
 
+  // Empty columns — one issue per completely empty column
+  for (const col of columnProfiles) {
+    if (col.isEmpty) {
+      issues.push({
+        id: `empty_column_${col.name}`,
+        type: "empty_column",
+        severity: "medium",
+        column: col.name,
+        count: rowCount,
+        description: `\`${col.name}\` contains no values — the column is entirely empty`,
+      });
+    }
+  }
+
   // --- Quality score ---
   const qualityScore = calcQualityScore({
-    totalCells: rowCount * columnNames.length,
-    totalMissing,
+    totalCellsNonEmpty,
+    totalMissingNonEmpty,
     rowCount,
     duplicateRowCount,
     columnsWithInconsistencies,
     totalNumericCells,
     totalOutliers,
+    emptyColumnCount,
   });
 
   return {
@@ -469,6 +447,7 @@ export function profileDataset(dataset: Dataset): DatasetProfile {
     columnCount: columnNames.length,
     incompleteRowCount,
     duplicateRowCount,
+    emptyColumnCount,
     columns: columnProfiles,
     issues,
     qualityScore,

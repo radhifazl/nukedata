@@ -6,6 +6,67 @@ export type ParseCsvResult =
   | { ok: true; dataset: Dataset }
   | { ok: false; error: string };
 
+// ---------------------------------------------------------------------------
+// Schema normalization helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the authoritative column list from raw header fields.
+ *
+ * Rules:
+ *   1. Trim each field name.
+ *   2. Remove trailing blank column names (phantom columns from trailing delimiters).
+ *   3. Keep genuinely empty columns that appear in the interior of the header
+ *      (e.g. "Name,,Phone" keeps the middle column, renamed to a placeholder).
+ */
+export function normalizeColumns(rawFields: string[]): string[] {
+  // Trim all field names
+  const trimmed = rawFields.map((f) => f.trim());
+
+  // Strip trailing empty/blank fields — these come from "A,B,C,D," trailing delimiters
+  let end = trimmed.length;
+  while (end > 0 && trimmed[end - 1] === "") {
+    end--;
+  }
+  const withoutTrailing = trimmed.slice(0, end);
+
+  // Rename interior blank header fields so they are identifiable
+  return withoutTrailing.map((name, i) =>
+    name === "" ? `(Unnamed Column ${i + 1})` : name
+  );
+}
+
+/**
+ * Clamps a parsed row to the canonical column schema.
+ *
+ * - Extra fields (row wider than schema) are discarded.
+ * - Missing fields (row narrower than schema) are filled with "".
+ *
+ * This ensures no phantom column is created from a trailing delimiter
+ * that happens to appear only on data rows and not on the header.
+ */
+function normalizeRow(
+  row: Record<string, unknown>,
+  columns: string[],
+  rawFields: string[]
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const col of columns) {
+    // rawFields may differ from columns (interior blank renames), look up by original field name
+    const rawIdx = rawFields.findIndex((f, i) => {
+      const trimmed = f.trim();
+      const canonical = trimmed === "" ? `(Unnamed Column ${i + 1})` : trimmed;
+      return canonical === col;
+    });
+    result[col] = rawIdx !== -1 ? (row[rawFields[rawIdx]] ?? "") : "";
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// CSV parser
+// ---------------------------------------------------------------------------
+
 export function parseCsv(file: File): Promise<ParseCsvResult> {
   const ext = file.name.split(".").pop()?.toLowerCase();
 
@@ -54,7 +115,22 @@ export function parseCsv(file: File): Promise<ParseCsvResult> {
           return;
         }
 
-        const rows = result.data;
+        // ── Normalize columns (strip trailing phantom fields) ──
+        const columns = normalizeColumns(rawFields);
+
+        if (columns.length === 0) {
+          resolve({
+            ok: false,
+            error:
+              "We couldn't read this CSV. Check that the file is a valid CSV and try again.",
+          });
+          return;
+        }
+
+        // ── Normalize rows (clamp to schema, fill short rows) ──
+        const rows = result.data.map((row) =>
+          normalizeRow(row, columns, rawFields)
+        );
 
         if (rows.length === 0) {
           resolve({
@@ -67,7 +143,7 @@ export function parseCsv(file: File): Promise<ParseCsvResult> {
         const dataset: Dataset = {
           name: file.name,
           fileSize: file.size,
-          columns: rawFields.map((name) => ({ name })),
+          columns: columns.map((name) => ({ name })),
           rows,
           rowCount: rows.length,
           createdAt: new Date().toISOString(),
@@ -85,6 +161,10 @@ export function parseCsv(file: File): Promise<ParseCsvResult> {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// XLSX / XLS parser
+// ---------------------------------------------------------------------------
 
 async function parseWorkbook(file: File): Promise<ParseCsvResult> {
   if (file.size === 0) {
@@ -104,7 +184,10 @@ async function parseWorkbook(file: File): Promise<ParseCsvResult> {
     });
 
     const [headerRow, ...dataRows] = values;
-    const columns = (headerRow as unknown[] ?? []).map((v) => String(v).trim());
+    const rawHeaderValues = (headerRow as unknown[] ?? []).map((v) => String(v));
+
+    // ── Normalize columns (strip trailing blank headers) ──
+    const columns = normalizeColumns(rawHeaderValues);
 
     if (columns.length === 0 || columns.every((c) => !c)) {
       return { ok: false, error: "This spreadsheet needs a header row to be imported." };
@@ -114,9 +197,23 @@ async function parseWorkbook(file: File): Promise<ParseCsvResult> {
       return { ok: false, error: "This dataset contains columns but no rows." };
     }
 
+    // ── Build rows clamped to the canonical column schema ──
+    // rawHeaderValues is used to locate the original column position.
+    const schemaIndices = columns.map((col) =>
+      rawHeaderValues.findIndex((h, i) => {
+        const trimmed = h.trim();
+        const canonical = trimmed === "" ? `(Unnamed Column ${i + 1})` : trimmed;
+        return canonical === col;
+      })
+    );
+
     const rows = dataRows.map((row) =>
       Object.fromEntries(
-        columns.map((col, i) => [col, (row as unknown[])[i] ?? ""])
+        columns.map((col, ci) => {
+          const srcIdx = schemaIndices[ci];
+          const val = srcIdx !== -1 ? (row as unknown[])[srcIdx] ?? "" : "";
+          return [col, val];
+        })
       )
     );
 

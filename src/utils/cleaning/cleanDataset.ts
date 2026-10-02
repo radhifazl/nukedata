@@ -12,13 +12,14 @@ export function cleanDataset(
 ): Dataset {
   if (operations.length === 0) return original;
 
-  // Deep-clone the rows so we never touch the original
+  // Deep-clone rows and track current column set (remove_column may shrink it)
   let rows: Record<string, unknown>[] = original.rows.map((r) => ({ ...r }));
+  let columns = [...original.columns];
 
   for (const op of operations) {
     switch (op.type) {
       case "remove_duplicates":
-        rows = applyRemoveDuplicates(rows, original.columns.map((c) => c.name), op);
+        rows = applyRemoveDuplicates(rows, columns.map((c) => c.name), op);
         break;
       case "fill_missing":
         rows = applyFillMissing(rows, op);
@@ -32,11 +33,18 @@ export function cleanDataset(
       case "remove_outlier_rows":
         rows = applyRemoveOutlierRows(rows, op);
         break;
+      case "remove_column": {
+        const result = applyRemoveColumn(rows, columns, op);
+        rows = result.rows;
+        columns = result.columns;
+        break;
+      }
     }
   }
 
   return {
     ...original,
+    columns,
     rows,
     rowCount: rows.length,
   };
@@ -176,4 +184,27 @@ function applyRemoveOutlierRows(
   const indices = new Set<number>((op.config.rowIndices as number[]) ?? []);
   if (indices.size === 0) return rows;
   return rows.filter((_, i) => !indices.has(i));
+}
+
+// ---------------------------------------------------------------------------
+// remove_column
+// config: { column: string }  — removes the column from schema and all rows
+// ---------------------------------------------------------------------------
+
+function applyRemoveColumn(
+  rows: Record<string, unknown>[],
+  columns: import("@/types/dataset").DatasetColumn[],
+  op: CleaningOperation
+): { rows: Record<string, unknown>[]; columns: import("@/types/dataset").DatasetColumn[] } {
+  const column = op.column ?? (op.config.column as string | undefined);
+  if (!column) return { rows, columns };
+
+  const newColumns = columns.filter((c) => c.name !== column);
+  const newRows = rows.map((row) => {
+    const copy = { ...row };
+    delete copy[column];
+    return copy;
+  });
+
+  return { rows: newRows, columns: newColumns };
 }

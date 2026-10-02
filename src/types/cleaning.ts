@@ -3,7 +3,8 @@ export type CleaningOperationType =
   | "fill_missing"
   | "normalize_text"
   | "convert_type"
-  | "remove_outlier_rows";
+  | "remove_outlier_rows"
+  | "remove_column";
 
 export interface CleaningOperation {
   id: string;

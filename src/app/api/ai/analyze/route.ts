@@ -15,7 +15,10 @@ import type { CleaningOperationType } from "@/types/cleaning";
 export const dynamic = "force-dynamic";
 
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
-const TIMEOUT_MS = 30_000;
+/** Total budget for the entire request (model resolution + generateContent). */
+const TIMEOUT_MS = 55_000;
+/** Tighter budget for the model-listing / model-info side-requests. */
+const RESOLVE_TIMEOUT_MS = 8_000;
 
 // ---------------------------------------------------------------------------
 // Model resolution
@@ -76,9 +79,13 @@ function generateContentUrl(modelId: string, apiKey: string): string {
 async function discoverBestModel(apiKey: string): Promise<string | null> {
   let res: Response;
   try {
+    const ac = new AbortController();
+    const tid = setTimeout(() => ac.abort(), RESOLVE_TIMEOUT_MS);
     res = await fetch(`${GEMINI_BASE}/models?key=${apiKey}`, {
       headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
     });
+    clearTimeout(tid);
   } catch {
     return null;
   }
@@ -137,7 +144,12 @@ async function resolveModel(
 
     let res: Response;
     try {
-      res = await fetch(`${GEMINI_BASE}/${normalized}?key=${apiKey}`);
+      const ac = new AbortController();
+      const tid = setTimeout(() => ac.abort(), RESOLVE_TIMEOUT_MS);
+      res = await fetch(`${GEMINI_BASE}/${normalized}?key=${apiKey}`, {
+        signal: ac.signal,
+      });
+      clearTimeout(tid);
     } catch {
       // Network error — just try to use the model anyway; the generateContent
       // call will give the real error.
@@ -274,7 +286,7 @@ function extractJson(text: string): string {
   }
 
   throw new Error(
-    "AI returned a response that could not be parsed as JSON. Please try again."
+    "AI returned a response that could not be parsed as JSON. Please try again.",
   );
 }
 
@@ -283,7 +295,9 @@ function parseGeminiResult(text: string): AiAnalysisResult {
   try {
     raw = JSON.parse(extractJson(text));
   } catch (err) {
-    throw err instanceof Error ? err : new Error("AI returned malformed JSON. Please try again.");
+    throw err instanceof Error
+      ? err
+      : new Error("AI returned malformed JSON. Please try again.");
   }
 
   const insights: AiInsight[] = [];
@@ -407,7 +421,7 @@ export async function POST(request: Request) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 1024,
           responseMimeType: "application/json",
         },
       }),

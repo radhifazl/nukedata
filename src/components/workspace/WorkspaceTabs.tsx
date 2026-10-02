@@ -71,7 +71,10 @@ function WorkspaceTabsInner({ dataset, profile }: WorkspaceTabsProps) {
     navigateToTab("columns");
   }
 
-  const totalMissing = effectiveProfile.columns.reduce((s, c) => s + c.missingCount, 0);
+  // Only count missing values from non-empty columns — empty columns are tracked separately
+  const totalMissing = effectiveProfile.columns
+    .filter((c) => !c.isEmpty)
+    .reduce((s, c) => s + c.missingCount, 0);
 
   return (
     <div className="flex flex-col">

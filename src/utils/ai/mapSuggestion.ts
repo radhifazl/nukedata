@@ -134,5 +134,9 @@ export function mapSuggestionToOperation(
     // we cannot map this from a suggestion without re-running IQR detection.
     case "remove_outlier_rows":
       return null;
+
+    // This mapper only supports suggestions for the operations above.
+    case "remove_column":
+      return null;
   }
 }
